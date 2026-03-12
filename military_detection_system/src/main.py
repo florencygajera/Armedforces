@@ -7,6 +7,7 @@ import sys
 import os
 import json
 import threading
+import time
 from urllib.parse import urlparse
 import argparse
 import logging
@@ -16,8 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.detector import MilitaryDetector
-from src.stream_handler import StreamHandler
-import time
+from src.stream_handler import RTSPStreamHandler
 
 
 def _is_stream_url(value):
@@ -25,8 +25,7 @@ def _is_stream_url(value):
     parsed = urlparse(value)
     return bool(parsed.scheme and parsed.netloc)
 
-def process_camera(camera_config, detector):
-    print(f"Starting inference on {camera_config['id']} ({camera_config['url']})")
+
 def setup_logging(level=logging.INFO):
     """Configure logging for the application"""
     logging.basicConfig(
@@ -61,6 +60,9 @@ def process_camera(camera_config, detector, save_output=False):
 
 def main():
     """Main entry point"""
+    # Define project root (parent of src directory)
+    project_root = Path(__file__).parent.parent
+    
     parser = argparse.ArgumentParser(description='Military Detection System')
     parser.add_argument('--config', '-c', default='configs/streams_config.json',
                         help='Path to streams configuration file')
@@ -78,42 +80,22 @@ def main():
     # Setup logging
     log_level = logging.DEBUG if args.debug else logging.INFO
     setup_logging(log_level)
-    
-    with open(streams_config, "r") as f:
-        streams = json.load(f)["cameras"]
-        
-    # Update local video paths to absolute paths (leave stream URLs unchanged)
-    for cam in streams:
-        url = cam['url']
-        if not _is_stream_url(url) and not os.path.isabs(url):
-            cam['url'] = os.path.join(project_root, url)
-        print(f"Camera {cam['id']}: {cam['url']}")
     logger = logging.getLogger(__name__)
-    logger.info("Starting Military Detection System")
-    
-    # Get project root
-    project_root = Path(__file__).parent.parent
-    
-    # Initialize detector
-    detector = MilitaryDetector(
-        model_path=args.model,
-        confidence_thresh=args.confidence
-    )
     
     # Load streams configuration
     config_path = project_root / args.config
-    logger.info(f"Loading streams from: {config_path}")
+    logging.info(f"Loading streams from: {config_path}")
     
     try:
         config = load_config(config_path)
     except FileNotFoundError:
-        logger.error(f"Config file not found: {config_path}")
+        logging.error(f"Config file not found: {config_path}")
         return
     
     cameras = config.get('cameras', [])
     
     if not cameras:
-        logger.warning("No cameras configured")
+        logging.warning("No cameras configured")
         return
     
     # Process each camera
@@ -125,6 +107,11 @@ def main():
     
     # Process first camera (can be extended to multi-threaded)
     if cameras:
+        # Initialize detector
+        detector = MilitaryDetector(
+            model_path=args.model,
+            confidence_thresh=args.confidence
+        )
         process_camera(cameras[0], detector, args.save)
 
 
