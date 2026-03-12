@@ -34,6 +34,7 @@ logs/
 *.log
 *.out
 *.err
+logs/alerts.json
 
 # ==================================================
 # AI / ML Model Weights
