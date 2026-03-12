@@ -18,6 +18,8 @@ class MilitaryDetector:
         if not os.path.isabs(model_path):
             model_path = os.path.join(project_root, model_path)
         
+        print(f"Loading model from: {model_path}")
+        
         # Initialize YOLOv8 or RT-DETR model
         self.model = YOLO(model_path)
         self.conf = confidence_thresh
@@ -25,14 +27,22 @@ class MilitaryDetector:
         
         # Target classes: 0: tank, 1: military_vehicle, 2: drone, 3: ship, 4: soldier, 5: aircraft
         self.target_classes = [0, 1, 2, 3, 4, 5] 
+        print(f"Detector initialized with {len(self.target_classes)} target classes")
 
     def process_stream(self, stream_url, camera_id):
+        print(f"Opening stream: {stream_url}")
         handler = RTSPStreamHandler(stream_url)
         
+        frame_count = 0
         while True:
             ret, frame = handler.read()
             if not ret:
-                continue
+                print(f"No more frames from {camera_id}")
+                break
+            
+            frame_count += 1
+            if frame_count % 30 == 0:
+                print(f"Processing frame {frame_count} from {camera_id}")
                 
             # Perform tracking utilizing DeepSORT under the hood of Ultralytics tracking logic
             results = self.model.track(frame, conf=self.conf, classes=self.target_classes, persist=True, verbose=False)
@@ -45,12 +55,8 @@ class MilitaryDetector:
                     cls_name = self.model.names[cls_id]
                     
                     if conf > 0.8: # High confidence threat alert
+                        print(f"Alert: {cls_name} detected with {conf:.2f} confidence")
                         self.alert_system.trigger_alert(cls_name, conf, camera_id)
                         
-            # Optionally visualize
-            annotated_frame = results[0].plot()
-            cv2.imshow(camera_id, annotated_frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-                
         handler.release()
+        print(f"Finished processing {frame_count} frames from {camera_id}")

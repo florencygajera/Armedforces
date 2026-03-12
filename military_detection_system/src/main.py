@@ -19,12 +19,22 @@ def process_camera(camera_config, detector):
 if __name__ == "__main__":
     # Get the project root directory
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    print(f"Project root: {project_root}")
     
     detector = MilitaryDetector(model_path="yolov8x.pt", confidence_thresh=0.5)
 
     streams_config = os.path.join(project_root, "configs", "streams_config.json")
+    print(f"Loading streams from: {streams_config}")
+    
     with open(streams_config, "r") as f:
         streams = json.load(f)["cameras"]
+        
+    # Update stream URLs to absolute paths
+    for cam in streams:
+        url = cam['url']
+        if not os.path.isabs(url):
+            cam['url'] = os.path.join(project_root, url)
+        print(f"Camera {cam['id']}: {cam['url']}")
 
     threads = []
     for cam in streams:
