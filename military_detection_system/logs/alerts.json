@@ -1,1 +1,14 @@
-{"class": "motorcycle", "confidence": 0.83, "camera_id": "drone_video_feed", "timestamp": "2026-03-12T09:09:03.310585Z"}
+[
+  {
+    "class": "motorcycle",
+    "confidence": 0.83,
+    "camera_id": "drone_video_feed",
+    "timestamp": "2026-03-12T09:09:03.310585Z"
+  },
+  {
+    "class": "motorcycle",
+    "confidence": 0.83,
+    "camera_id": "drone_video_feed",
+    "timestamp": "2026-03-12T09:53:59.409602Z"
+  }
+]
