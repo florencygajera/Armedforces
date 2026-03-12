@@ -1,0 +1,9 @@
+{
+    "cameras": [
+        {
+            "id": "drone_video_feed",
+            "type": "video",
+            "url": "videos/drone.mp4"
+        }
+    ]
+}

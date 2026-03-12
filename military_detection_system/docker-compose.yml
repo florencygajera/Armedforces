@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  detector:
+    build: .
+    volumes:
+      - ./configs:/app/configs
+      - ./models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - MQTT_BROKER=mosquitto
+    depends_on:
+      - mosquitto
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - mosquitto-data:/mosquitto/data
+
+volumes:
+  mosquitto-data:

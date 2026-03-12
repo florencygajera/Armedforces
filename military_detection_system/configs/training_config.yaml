@@ -1,0 +1,29 @@
+# YOLO Training specific configurations for Military Dataset
+
+path: ../datasets/military
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: tank
+  1: military_vehicle
+  2: drone
+  3: ship
+  4: soldier
+  5: aircraft
+
+# Augmentations for robustness
+hsv_h: 0.015
+hsv_s: 0.7
+hsv_v: 0.4
+degrees: 0.0
+translate: 0.1
+scale: 0.5
+shear: 0.0
+perspective: 0.0
+flipud: 0.0
+fliplr: 0.5
+mosaic: 1.0 # Use mosaic for small object context
+mixup: 0.0
+copy_paste: 0.0
