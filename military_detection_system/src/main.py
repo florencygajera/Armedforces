@@ -1,49 +1,114 @@
+"""
+Military Detection System - Main Entry Point
+Real-time object detection and tracking for military surveillance
+"""
+
 import sys
 import os
 import json
-import threading
+import argparse
+import logging
+from pathlib import Path
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.detector import MilitaryDetector
+from src.stream_handler import StreamHandler
 import time
 
-def process_camera(camera_config, detector):
-    print(f"Starting inference on {camera_config['id']} ({camera_config['url']})")
+
+def setup_logging(level=logging.INFO):
+    """Configure logging for the application"""
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler('logs/system.log')
+        ]
+    )
+
+
+def load_config(config_path):
+    """Load configuration from JSON file"""
+    with open(config_path, 'r') as f:
+        return json.load(f)
+
+
+def process_camera(camera_config, detector, save_output=False):
+    """Process a single camera stream"""
+    camera_id = camera_config['id']
+    stream_url = camera_config['url']
+    
+    logging.info(f"Starting inference on {camera_id} ({stream_url})")
+    
     try:
-        detector.process_stream(camera_config['url'], camera_config['id'])
+        detector.process_stream(stream_url, camera_id, save_output)
     except Exception as e:
-        print(f"Stream {camera_config['id']} stopped: {e}")
+        logging.error(f"Stream {camera_id} error: {e}")
+        raise
+
+
+def main():
+    """Main entry point"""
+    parser = argparse.ArgumentParser(description='Military Detection System')
+    parser.add_argument('--config', '-c', default='configs/streams_config.json',
+                        help='Path to streams configuration file')
+    parser.add_argument('--model', '-m', default='yolov8x.pt',
+                        help='Path to YOLO model')
+    parser.add_argument('--confidence', '-conf', type=float, default=0.5,
+                        help='Confidence threshold')
+    parser.add_argument('--save', '-s', action='store_true',
+                        help='Save detection output to video')
+    parser.add_argument('--debug', '-d', action='store_true',
+                        help='Enable debug logging')
+    
+    args = parser.parse_args()
+    
+    # Setup logging
+    log_level = logging.DEBUG if args.debug else logging.INFO
+    setup_logging(log_level)
+    
+    logger = logging.getLogger(__name__)
+    logger.info("Starting Military Detection System")
+    
+    # Get project root
+    project_root = Path(__file__).parent.parent
+    
+    # Initialize detector
+    detector = MilitaryDetector(
+        model_path=args.model,
+        confidence_thresh=args.confidence
+    )
+    
+    # Load streams configuration
+    config_path = project_root / args.config
+    logger.info(f"Loading streams from: {config_path}")
+    
+    try:
+        config = load_config(config_path)
+    except FileNotFoundError:
+        logger.error(f"Config file not found: {config_path}")
+        return
+    
+    cameras = config.get('cameras', [])
+    
+    if not cameras:
+        logger.warning("No cameras configured")
+        return
+    
+    # Process each camera
+    for camera in cameras:
+        # Resolve relative paths
+        url = camera['url']
+        if not os.path.isabs(url):
+            camera['url'] = str(project_root / url)
+    
+    # Process first camera (can be extended to multi-threaded)
+    if cameras:
+        process_camera(cameras[0], detector, args.save)
+
 
 if __name__ == "__main__":
-    # Get the project root directory
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    print(f"Project root: {project_root}")
-    
-    detector = MilitaryDetector(model_path="yolov8x.pt", confidence_thresh=0.5)
-
-    streams_config = os.path.join(project_root, "configs", "streams_config.json")
-    print(f"Loading streams from: {streams_config}")
-    
-    with open(streams_config, "r") as f:
-        streams = json.load(f)["cameras"]
-        
-    # Update stream URLs to absolute paths
-    for cam in streams:
-        url = cam['url']
-        if not os.path.isabs(url):
-            cam['url'] = os.path.join(project_root, url)
-        print(f"Camera {cam['id']}: {cam['url']}")
-
-    threads = []
-    for cam in streams:
-        t = threading.Thread(target=process_camera, args=(cam, detector), daemon=True)
-        t.start()
-        threads.append(t)
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down system.")
+    main()
