@@ -1,6 +1,11 @@
 {
     "cameras": [
         {
+            "id": "cctv_live_gate_1",
+            "type": "rtsp",
+            "url": "rtsp://username:password@192.168.1.50:554/stream1"
+        },
+        {
             "id": "drone_video_feed",
             "type": "video",
             "url": "videos/drone.mp4"
