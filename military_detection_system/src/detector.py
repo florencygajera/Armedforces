@@ -1,10 +1,23 @@
 from ultralytics import YOLO
 import cv2
+import os
+import sys
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from src.alerts import AlertSystem
 from src.stream_handler import RTSPStreamHandler
 
 class MilitaryDetector:
     def __init__(self, model_path="yolov8x.pt", confidence_thresh=0.5):
+        # Get project root
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # If model_path is relative, make it absolute
+        if not os.path.isabs(model_path):
+            model_path = os.path.join(project_root, model_path)
+        
         # Initialize YOLOv8 or RT-DETR model
         self.model = YOLO(model_path)
         self.conf = confidence_thresh

@@ -1,5 +1,7 @@
 import json
 import logging
+import os
+import sys
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
@@ -15,8 +17,13 @@ class AlertSystem:
         self.logger = logging.getLogger("AlertSystem")
         self.logger.setLevel(logging.INFO)
         
+        # Get project root and create logs directory path
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        logs_dir = os.path.join(project_root, "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        
         # Also log to a file
-        handler = logging.FileHandler('logs/alerts.json')
+        handler = logging.FileHandler(os.path.join(logs_dir, 'alerts.json'))
         self.logger.addHandler(handler)
 
     def trigger_alert(self, class_name, confidence, camera_id):
