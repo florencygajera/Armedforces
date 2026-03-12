@@ -6,6 +6,8 @@ Real-time object detection and tracking for military surveillance
 import sys
 import os
 import json
+import threading
+from urllib.parse import urlparse
 import argparse
 import logging
 from pathlib import Path
@@ -18,6 +20,13 @@ from src.stream_handler import StreamHandler
 import time
 
 
+def _is_stream_url(value):
+    """Return True for network stream URLs (rtsp/http/https/rtmp)."""
+    parsed = urlparse(value)
+    return bool(parsed.scheme and parsed.netloc)
+
+def process_camera(camera_config, detector):
+    print(f"Starting inference on {camera_config['id']} ({camera_config['url']})")
 def setup_logging(level=logging.INFO):
     """Configure logging for the application"""
     logging.basicConfig(
@@ -70,6 +79,15 @@ def main():
     log_level = logging.DEBUG if args.debug else logging.INFO
     setup_logging(log_level)
     
+    with open(streams_config, "r") as f:
+        streams = json.load(f)["cameras"]
+        
+    # Update local video paths to absolute paths (leave stream URLs unchanged)
+    for cam in streams:
+        url = cam['url']
+        if not _is_stream_url(url) and not os.path.isabs(url):
+            cam['url'] = os.path.join(project_root, url)
+        print(f"Camera {cam['id']}: {cam['url']}")
     logger = logging.getLogger(__name__)
     logger.info("Starting Military Detection System")
     

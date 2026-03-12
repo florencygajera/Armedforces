@@ -3,29 +3,31 @@ import threading
 import queue
 import os
 
+
 class RTSPStreamHandler:
     """
-    Handles robust reading from video files or RTSP streams
+    Handles robust reading from video files or RTSP streams.
     """
+
     def __init__(self, stream_url, buffer_size=10):
         self.stream_url = stream_url
-        
+
         # Check if it's a file path
         if os.path.isfile(stream_url):
             print(f"Opening video file: {stream_url}")
             self.cap = cv2.VideoCapture(stream_url)
             self.is_video_file = True
         else:
-            print(f"Opening RTSP stream: {stream_url}")
+            print(f"Opening network stream: {stream_url}")
             self.cap = cv2.VideoCapture(stream_url)
             self.is_video_file = False
-            
+
         if not self.cap.isOpened():
             print(f"ERROR: Could not open stream: {stream_url}")
-            
+
         self.q = queue.Queue(maxsize=buffer_size)
         self.stopped = False
-        
+
         # For video files, read in the same thread
         # For RTSP streams, use background thread
         if not self.is_video_file:
@@ -33,7 +35,7 @@ class RTSPStreamHandler:
             self.t.start()
 
     def _reader(self):
-        """Background reader for RTSP streams"""
+        """Background reader for RTSP/HTTP streams."""
         while not self.stopped:
             if not self.q.full():
                 ret, frame = self.cap.read()
@@ -49,19 +51,21 @@ class RTSPStreamHandler:
                     pass
 
     def read(self):
-        """Read a frame - for video files, read directly"""
+        """Read a frame - for video files, read directly."""
         if self.is_video_file:
             ret, frame = self.cap.read()
             return ret, frame
-        else:
-            # For RTSP streams, get from queue
-            if self.q.empty():
-                return False, None
-            return True, self.q.get()
+
+        # For network streams, wait briefly for buffer to fill
+        try:
+            frame = self.q.get(timeout=1.0)
+            return True, frame
+        except queue.Empty:
+            return False, None
 
     def release(self):
         self.stopped = True
-        if hasattr(self, 't'):
-            self.t.join()
+        if hasattr(self, "t"):
+            self.t.join(timeout=1.0)
         self.cap.release()
         print("Stream released")
