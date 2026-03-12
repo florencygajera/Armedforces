@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import sys
+import winsound
 from datetime import datetime
 import paho.mqtt.client as mqtt
 
@@ -26,6 +27,14 @@ class AlertSystem:
         handler = logging.FileHandler(os.path.join(logs_dir, 'alerts.json'))
         self.logger.addHandler(handler)
 
+    def play_alert_sound(self):
+        """Play a system beep sound for alert"""
+        try:
+            # Play Windows system sound (beep)
+            winsound.PlaySound(winsound.ALERT, winsound.SND_ASYNC)
+        except Exception as e:
+            print(f"Could not play sound: {e}")
+
     def trigger_alert(self, class_name, confidence, camera_id):
         alert_payload = {
             "class": class_name,
@@ -36,6 +45,10 @@ class AlertSystem:
         
         # Log to JSON
         self.logger.info(json.dumps(alert_payload))
+        
+        # Play alert sound
+        print(f"\a")  # Terminal beep
+        self.play_alert_sound()
         
         # Send via MQTT
         try:
