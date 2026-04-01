@@ -1,6 +1,6 @@
 # Placeholder to integrate DeepSORT specifically if Ultralytics internal tracking is not enough.
-# Generally YOLOv8 model.track() provides ByteTrack and BoT-SORT out of the box which are highly capable.
-import cv2
+# Generally YOLOv8 model.track() provides ByteTrack and BoT-SORT out of the box which are highly capable.\
+
 
 class Tracker:
     def __init__(self):
