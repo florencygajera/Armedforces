@@ -1,8 +1,5 @@
-from ultralytics import YOLO
-import os
-import sys
 """
-Military Detection System - Detector Module
+Military Detection System - Detector Module (UPDATED)
 YOLOv8-based object detection for military surveillance
 """
 
@@ -17,100 +14,99 @@ from src.alerts import AlertSystem
 from src.stream_handler import RTSPStreamHandler
 
 
-
 class MilitaryDetector:
-    # COCO class names for reference
     TARGET_CLASSES = {
-        0: 'tank',
-        1: 'military_vehicle', 
-        2: 'drone',
-        3: 'ship',
-        4: 'soldier',
-        5: 'aircraft'
+        0: "tank",
+        1: "military_vehicle",
+        2: "drone",
+        3: "ship",
+        4: "soldier",
+        5: "aircraft",
     }
-    
-    def __init__(self, model_path="yolov8x.pt", confidence_thresh=0.5):
-        """Initialize the detector
-        
-        Args:
-            model_path: Path to YOLO model weights
-            confidence_thresh: Minimum confidence for detections
-        """
+
+    def __init__(
+        self,
+        model_path="runs/detect/military_v1/weights/best.pt",  # ✅ FIXED
+        confidence_thresh=0.6,  # ✅ better threshold
+    ):
         self.logger = logging.getLogger(__name__)
-        
-        # Get project root
+        logging.basicConfig(level=logging.INFO)
+
         project_root = Path(__file__).parent.parent
-        
+
         # Resolve model path
         if not Path(model_path).is_absolute():
             model_path = project_root / model_path
-        
+
+        if not Path(model_path).exists():
+            raise FileNotFoundError(f"Model not found: {model_path}")
+
         self.logger.info(f"Loading model from: {model_path}")
-        
-        # Initialize YOLO model
+
+        # Load trained model
         self.model = YOLO(str(model_path))
+
         self.confidence_thresh = confidence_thresh
         self.alert_system = AlertSystem()
-        
-        # Target classes for detection
+
         self.target_classes = list(self.TARGET_CLASSES.keys())
-        
-        # Performance tracking
+
         self.frame_times = []
         self.detection_count = 0
-        
-        self.logger.info(f"Detector initialized with {len(self.target_classes)} target classes")
-    
-    def process_stream(self, stream_url, camera_id, save_output=False, output_dir="logs/detections"):
-        """Process a video stream
-        
-        Args:
-            stream_url: URL or path to video stream
-            camera_id: Identifier for the camera
-            save_output: Whether to save annotated video
-            output_dir: Directory to save output videos
-        """
+
+        self.logger.info(
+            f"Detector initialized with {len(self.target_classes)} classes"
+        )
+
+    def process_stream(
+        self,
+        stream_url,
+        camera_id="cam_1",
+        save_output=True,
+        output_dir="logs/detections",
+    ):
         self.logger.info(f"Opening stream: {stream_url}")
-        
+
         handler = RTSPStreamHandler(stream_url)
-        
-        # Video writer for saving output
+
         writer = None
+        output_path = None
+
         if save_output:
             output_path = Path(output_dir) / f"{camera_id}_{int(time.time())}.mp4"
             output_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         frame_count = 0
         start_time = time.time()
-        
+
         try:
             while True:
                 ret, frame = handler.read()
                 if not ret:
-                    self.logger.info(f"No more frames from {camera_id}")
                     break
-                
+
                 frame_count += 1
                 frame_start = time.time()
-                
-                # Perform detection with tracking
+
+                # 🔥 Detection + tracking
                 results = self.model.track(
-                    frame, 
-                    conf=self.confidence_thresh, 
+                    frame,
+                    conf=self.confidence_thresh,
                     classes=self.target_classes,
                     persist=True,
-                    verbose=False
+                    verbose=False,
                 )
-                
-                # Process detections
+
                 annotated_frame = self._process_results(results, frame, camera_id)
-                
-                # Calculate FPS
+
+                # FPS calculation
                 frame_time = time.time() - frame_start
                 self.frame_times.append(frame_time)
-                avg_fps = 1.0 / np.mean(self.frame_times[-30:]) if self.frame_times else 0
-                
-                # Add FPS display to frame
+                avg_fps = (
+                    1.0 / np.mean(self.frame_times[-30:]) if self.frame_times else 0
+                )
+
+                # Draw FPS
                 cv2.putText(
                     annotated_frame,
                     f"FPS: {avg_fps:.1f}",
@@ -118,88 +114,69 @@ class MilitaryDetector:
                     cv2.FONT_HERSHEY_SIMPLEX,
                     1,
                     (0, 255, 0),
-                    2
+                    2,
                 )
-                
-                # Save output if enabled
+
+                # Initialize writer
                 if save_output and writer is None:
                     h, w = annotated_frame.shape[:2]
-                    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+                    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
                     writer = cv2.VideoWriter(str(output_path), fourcc, 30, (w, h))
                     self.logger.info(f"Saving output to: {output_path}")
-                
+
                 if writer:
                     writer.write(annotated_frame)
-                
-                # Print progress every 30 frames
+
                 if frame_count % 30 == 0:
                     self.logger.info(
-                        f"Processing frame {frame_count} | "
-                        f"FPS: {avg_fps:.1f} | "
-                        f"Detections: {self.detection_count}"
+                        f"Frame: {frame_count} | FPS: {avg_fps:.1f} | Detections: {self.detection_count}"
                     )
-                
+
         finally:
             handler.release()
             if writer:
                 writer.release()
-            
-            # Summary statistics
+
             total_time = time.time() - start_time
             avg_fps = frame_count / total_time if total_time > 0 else 0
+
             self.logger.info(
-                f"Finished processing {frame_count} frames from {camera_id} | "
-                f"Avg FPS: {avg_fps:.1f} | "
-                f"Total detections: {self.detection_count}"
+                f"Finished {frame_count} frames | Avg FPS: {avg_fps:.1f} | Total detections: {self.detection_count}"
             )
-    
+
     def _process_results(self, results, frame, camera_id):
-        """Process detection results
-        
-        Args:
-            results: YOLO detection results
-            frame: Original frame
-            camera_id: Camera identifier
-            
-        Returns:
-            Annotated frame with bounding boxes
-        """
         annotated_frame = frame.copy()
-        
+
+        if not results:
+            return annotated_frame
+
         for result in results:
             boxes = result.boxes
+
             for box in boxes:
                 cls_id = int(box.cls[0])
                 conf = float(box.conf[0])
-                
-                # Only alert for high confidence detections
-                if conf > 0.8:
-                    cls_name = self.model.names.get(cls_id, f"class_{cls_id}")
-                    
+
+                # 🔥 Filter target classes + confidence
+                if cls_id in self.target_classes and conf > 0.8:
+                    cls_name = self.TARGET_CLASSES.get(cls_id, f"class_{cls_id}")
+
                     # Trigger alert
                     self.alert_system.trigger_alert(cls_name, conf, camera_id)
                     self.detection_count += 1
-                    
+
                     self.logger.warning(
                         f"ALERT: {cls_name} detected ({conf:.2f}) on {camera_id}"
                     )
-        
-        # Draw all detections on frame
-        annotated_frame = results[0].plot() if results else annotated_frame
-        
-        return annotated_frame
-    
+
+        return results[0].plot()
+
     def get_stats(self):
-        """Get detection statistics
-        
-        Returns:
-            Dictionary with statistics
-        """
         if not self.frame_times:
-            return {'fps': 0, 'avg_frame_time': 0, 'detections': 0}
-        
+            return {"fps": 0, "avg_frame_time": 0, "detections": 0}
+
         return {
-            'fps': 1.0 / np.mean(self.frame_times[-30:]),
-            'avg_frame_time': np.mean(self.frame_times),
-            'detections': self.detection_count
+            "fps": 1.0 / np.mean(self.frame_times[-30:]),
+            "avg_frame_time": np.mean(self.frame_times),
+            "detections": self.detection_count,
         }
