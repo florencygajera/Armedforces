@@ -1,24 +1,34 @@
 from ultralytics import YOLO
+import torch
+
 
 def train_model():
     print("Loading base model...")
-    model = YOLO('yolov8x.pt')
-    
-    # Train the model with focal loss implicitly balanced by class weights
-    # and utilize high-res P2 layers natively by passing imgsz=1280
+
+    # Use lightweight model (FAST + practical)
+    model = YOLO("yolov8n.pt")
+
     print("Starting training on military dataset...")
+
     results = model.train(
-        data='configs/training_config.yaml',
-        epochs=300,
-        imgsz=1280,
-        batch=8,
-        device='0' if __import__('torch').cuda.is_available() else 'cpu', # Auto-detect GPU or CPU
-        name='military_v1',
+        data="configs/training_config.yaml",
+        # 🔥 OPTIMIZED SETTINGS
+        epochs=30,  # reduced from 300
+        imgsz=640,  # reduced from 1280
+        batch=16,  # better utilization
+        # Auto GPU detection
+        device="0" if torch.cuda.is_available() else "cpu",
+        name="military_v1",
         exist_ok=True,
-        pretrained=True
+        pretrained=True,
+        # 🔥 EXTRA IMPROVEMENTS
+        workers=2,  # stable for Colab
+        patience=20,  # early stopping
+        verbose=True,
     )
-    
+
     print("Training complete.")
+
 
 if __name__ == "__main__":
     train_model()
