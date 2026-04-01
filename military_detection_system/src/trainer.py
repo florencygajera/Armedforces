@@ -10,7 +10,7 @@ def train_model():
 
     print("Starting training on military dataset...")
 
-    results = model.train(
+    model.train(
         data="configs/training_config.yaml",
         # 🔥 OPTIMIZED SETTINGS
         epochs=30,  # reduced from 300
